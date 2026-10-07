@@ -90,7 +90,7 @@ app.post("/api/submit",async(req,res)=>{
     const now=Date.now();
     const elapsed=Math.max(0,Math.round((now-new Date(row.started_at).getTime())/1000));
     const score=answers.reduce((s,a,i)=>s+questions[i].scores[a],0);
-    const status=elapsed>180?"Tiempo agotado":"Finalizado";
+    const status=elapsed>300?"Tiempo agotado":"Finalizado";
     const finishedAt=new Date(now).toISOString();
     if(pool){
       await pool.query(`UPDATE attempts SET answers=$1::jsonb,score=$2,elapsed=$3,finished_at=$4,status=$5 WHERE id=$6`,[JSON.stringify(answers),score,elapsed,finishedAt,status,id]);
