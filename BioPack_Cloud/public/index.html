@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BioPack · Business Challenge 2026</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#eef0f2;color:#333}
+.wrap{max-width:850px;margin:auto;padding:18px}
+.card{background:#fff;padding:25px;border-radius:18px;box-shadow:0 6px 25px #0002}
+.orange{color:#f47b20}.top{display:flex;justify-content:space-between;gap:15px}
+.timer{font-weight:bold;color:#f47b20;font-size:24px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{font-weight:bold;font-size:14px;display:block;margin-bottom:6px}
+input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ccc;border-radius:9px;font-size:16px}
+.btn{padding:13px 18px;border:0;border-radius:9px;font-weight:bold;background:#f47b20;color:white;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.ctx{background:#f5f5f5;border-left:5px solid #f47b20;padding:14px;line-height:1.5}
+.q{font-size:21px;font-weight:bold;margin:18px 0}
+.opt{display:block;width:100%;padding:14px;margin:8px 0;text-align:left;border:2px solid #ddd;background:white;border-radius:9px;cursor:pointer}
+.opt:hover{border-color:#f47b20}.sel{border-color:#f47b20;background:#fff4ea}
+.hide{display:none}.track{background:#ddd;height:8px;margin:15px 0}
+.bar{background:#f47b20;height:8px;width:0}.right{text-align:right;margin-top:18px}
+.notice{background:#fff4ea;border-left:5px solid #f47b20;padding:12px;margin:14px 0;border-radius:6px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.q{font-size:18px}.top{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<div class="top">
+<div><b class="orange" style="font-size:25px">BIOPACK</b><div>GRAN FINAL · BUSINESS CHALLENGE 2026</div></div>
+<div id="timer" class="timer hide">03:00</div>
+</div>
+
+<section id="startScreen">
+<h1>🌱 Misión Verde: el futuro de BioPack</h1>
+<p>Seleccionen la alternativa que consideren más conveniente en cada situación.</p>
+<div class="grid">
+<div><label for="teamInput">Nombre del equipo</label><input id="teamInput" autocomplete="off"></div>
+<div><label for="student1Input">Estudiante 1</label><input id="student1Input" autocomplete="off"></div>
+<div><label for="student2Input">Estudiante 2</label><input id="student2Input" autocomplete="off"></div>
+</div>
+<div id="startNotice" class="notice hide"></div>
+<div class="right"><button id="startButton" class="btn">Iniciar misión</button></div>
+</section>
+
+<section id="quizScreen" class="hide">
+<div class="top"><b id="teamLabel"></b><span id="count"></span></div>
+<div class="track"><div id="bar" class="bar"></div></div>
+<div id="qbox"></div><div id="opts"></div>
+<div class="right"><button id="nextButton" class="btn">Siguiente</button></div>
+</section>
+
+<section id="doneScreen" class="hide">
+<h1>✓ ¡Misión completada!</h1>
+<p>Las respuestas fueron registradas correctamente.</p>
+<p>Esperen las instrucciones del equipo organizador.</p>
+</section>
+</div></div>
+
+<script>
+(() => {
+const startScreen = document.getElementById("startScreen");
+const quizScreen = document.getElementById("quizScreen");
+const doneScreen = document.getElementById("doneScreen");
+const timerEl = document.getElementById("timer");
+const teamInput = document.getElementById("teamInput");
+const student1Input = document.getElementById("student1Input");
+const student2Input = document.getElementById("student2Input");
+const startButton = document.getElementById("startButton");
+const nextButton = document.getElementById("nextButton");
+const startNotice = document.getElementById("startNotice");
+const teamLabel = document.getElementById("teamLabel");
+const count = document.getElementById("count");
+const bar = document.getElementById("bar");
+const qbox = document.getElementById("qbox");
+const opts = document.getElementById("opts");
+
+let questions = [];
+let current = 0;
+let answers = [];
+let attemptId = null;
+let started = 0;
+let timerId = null;
+let finishing = false;
+
+function showNotice(message) {
+  startNotice.textContent = message;
+  startNotice.classList.remove("hide");
+}
+
+async function startMission() {
+  startNotice.classList.add("hide");
+
+  const team = teamInput.value.trim();
+  const student1 = student1Input.value.trim();
+  const student2 = student2Input.value.trim();
+
+  if (!team || !student1 || !student2) {
+    showNotice("Completen los tres datos antes de iniciar.");
+    return;
+  }
+
+  startButton.disabled = true;
+
+  try {
+    const response = await fetch("/api/start", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({team, student1, student2})
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showNotice(data.error || "No fue posible iniciar la misión.");
+      startButton.disabled = false;
+      return;
+    }
+
+    attemptId = data.id;
+    started = Date.now();
+    current = 0;
+    answers = [];
+    questions = await (await fetch("/api/questions")).json();
+
+    startScreen.classList.add("hide");
+    quizScreen.classList.remove("hide");
+    timerEl.classList.remove("hide");
+    teamLabel.textContent = "Equipo: " + team;
+
+    renderQuestion();
+    timerId = setInterval(updateClock, 250);
+  } catch (error) {
+    showNotice("No se pudo conectar con el servidor BioPack.");
+    startButton.disabled = false;
+  }
+}
+
+function updateClock() {
+  const left = Math.max(0, 180 - Math.floor((Date.now() - started) / 1000));
+  timerEl.textContent =
+    String(Math.floor(left / 60)).padStart(2,"0") + ":" +
+    String(left % 60).padStart(2,"0");
+
+  if (left <= 0) finishMission();
+}
+
+function renderQuestion() {
+  const item = questions[current];
+  count.textContent = `Pregunta ${current + 1} de 5`;
+  bar.style.width = ((current + 1) * 20) + "%";
+  qbox.innerHTML = `<div class="ctx">${item.context}</div><div class="q">${item.q}</div>`;
+
+  opts.innerHTML = item.opts.map((value, k) =>
+    `<button type="button" class="opt" data-index="${k}">${String.fromCharCode(65+k)}. ${value}</button>`
+  ).join("");
+
+  opts.querySelectorAll(".opt").forEach(button => {
+    button.addEventListener("click", () => {
+      const selected = Number(button.dataset.index);
+      answers[current] = selected;
+      opts.querySelectorAll(".opt").forEach((b, n) => b.classList.toggle("sel", n === selected));
+    });
+  });
+
+  nextButton.textContent = current === 4 ? "Finalizar misión" : "Siguiente";
+}
+
+function nextQuestion() {
+  if (answers[current] === undefined) {
+    alert("Seleccionen una opción.");
+    return;
+  }
+
+  if (current < 4) {
+    current++;
+    renderQuestion();
+  } else {
+    finishMission();
+  }
+}
+
+async function finishMission() {
+  if (finishing || !attemptId) return;
+  finishing = true;
+  clearInterval(timerId);
+  nextButton.disabled = true;
+
+  while (answers.length < 5) answers.push(0);
+
+  try {
+    const response = await fetch("/api/submit", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({id: attemptId, answers})
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "No fue posible registrar las respuestas.");
+      finishing = false;
+      nextButton.disabled = false;
+      return;
+    }
+
+    quizScreen.classList.add("hide");
+    timerEl.classList.add("hide");
+    doneScreen.classList.remove("hide");
+  } catch (error) {
+    alert("No se pudo conectar con el servidor para registrar las respuestas.");
+    finishing = false;
+    nextButton.disabled = false;
+  }
+}
+
+startButton.addEventListener("click", startMission);
+nextButton.addEventListener("click", nextQuestion);
+})();
+</script>
+</body>
+</html>

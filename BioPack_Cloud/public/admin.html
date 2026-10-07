@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BioPack | Administración</title>
+<style>
+body{font-family:Arial,sans-serif;background:#eef0f2;margin:0;padding:20px}
+.card{background:white;padding:22px;border-radius:16px;max-width:1200px;margin:auto}
+h1{color:#f47b20}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+button{padding:12px;border:0;border-radius:8px;background:#f47b20;color:white;font-weight:bold;cursor:pointer}
+input{padding:12px;border:1px solid #ccc;border-radius:8px}
+table{width:100%;border-collapse:collapse;margin-top:18px}
+th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}
+.warning{background:#fff4ea;border-left:5px solid #f47b20;padding:12px;margin:12px 0;border-radius:6px}
+.ok{background:#eef7ee;border-left:5px solid #5a9b5a;padding:12px;margin:12px 0;border-radius:6px}
+@media(max-width:700px){table{font-size:12px;display:block;overflow-x:auto}.actions{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Panel BioPack</h1>
+<p>Desde aquí la organización puede consultar la clasificación y exportar los resultados.</p>
+
+<div class="actions">
+<input id="keyInput" type="password" placeholder="Clave de administración">
+<button id="viewButton">Ver resultados</button>
+<button id="excelButton">Exportar Excel</button>
+<button id="resetButton">Borrar pruebas de ensayo</button>
+</div>
+
+<div id="msg"></div>
+<div id="tableContainer"></div>
+</div>
+
+<script>
+(() => {
+let adminKey = "";
+const keyInput = document.getElementById("keyInput");
+const msg = document.getElementById("msg");
+const tableContainer = document.getElementById("tableContainer");
+
+function message(text, type="warning") {
+  msg.className = type;
+  msg.textContent = text;
+}
+
+async function loadResults() {
+  adminKey = keyInput.value.trim();
+  if (!adminKey) return message("Ingresa la clave de administración.");
+
+  const response = await fetch("/api/results", {
+    headers: {"x-admin-key": adminKey}
+  });
+  const data = await response.json();
+
+  if (!response.ok) return message(data.error || "No autorizado.");
+
+  message(`${data.length} equipo(s) registrado(s).`, "ok");
+
+  tableContainer.innerHTML =
+    "<table><tr><th>Pos.</th><th>Equipo</th><th>Estudiante 1</th><th>Estudiante 2</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr>" +
+    data.map(x =>
+      `<tr><td>${x.position}</td><td>${x.team}</td><td>${x.student1}</td><td>${x.student2}</td><td>${x.score}</td><td>${String(Math.floor(x.elapsed/60)).padStart(2,"0")}:${String(x.elapsed%60).padStart(2,"0")}</td><td>${x.status}</td></tr>`
+    ).join("") +
+    "</table>";
+}
+
+async function resetTests() {
+  if (!adminKey) {
+    adminKey = keyInput.value.trim();
+  }
+  if (!adminKey) return message("Ingresa primero la clave de administración.");
+
+  if (!confirm("¿Eliminar todos los resultados actuales? Esta acción se recomienda solo antes del evento.")) return;
+
+  const response = await fetch("/api/reset", {
+    method: "POST",
+    headers: {"x-admin-key": adminKey}
+  });
+  const data = await response.json();
+
+  if (!response.ok) return message(data.error || "No se pudo restablecer.");
+
+  message(data.message, "ok");
+  tableContainer.innerHTML = "";
+}
+
+function exportExcel() {
+  if (!adminKey) adminKey = keyInput.value.trim();
+  if (!adminKey) return message("Ingresa primero la clave de administración.");
+  location.href = "/api/export?key=" + encodeURIComponent(adminKey);
+}
+
+document.getElementById("viewButton").addEventListener("click", loadResults);
+document.getElementById("resetButton").addEventListener("click", resetTests);
+document.getElementById("excelButton").addEventListener("click", exportExcel);
+})();
+</script>
+</body>
+</html>

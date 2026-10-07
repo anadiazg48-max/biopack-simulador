@@ -1,0 +1,14 @@
+{
+  "name": "biopack-simulador",
+  "version": "2.1.0",
+  "description": "Simulador final BioPack - Business Challenge 2026",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "exceljs": "^4.4.0",
+    "pg": "^8.16.3"
+  }
+}
