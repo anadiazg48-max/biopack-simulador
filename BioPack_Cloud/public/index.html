@@ -29,7 +29,7 @@ input{width:100%;padding:13px;box-sizing:border-box;border:1px solid #ccc;border
 <div class="wrap"><div class="card">
 <div class="top">
 <div><b class="orange" style="font-size:25px">BIOPACK</b><div>GRAN FINAL · BUSINESS CHALLENGE 2026</div></div>
-<div id="timer" class="timer hide">03:00</div>
+<div id="timer" class="timer hide">05:00</div>
 </div>
 
 <section id="startScreen">
@@ -138,7 +138,7 @@ async function startMission() {
 }
 
 function updateClock() {
-  const left = Math.max(0, 180 - Math.floor((Date.now() - started) / 1000));
+  const left = Math.max(0, 300 - Math.floor((Date.now() - started) / 1000));
   timerEl.textContent =
     String(Math.floor(left / 60)).padStart(2,"0") + ":" +
     String(left % 60).padStart(2,"0");
